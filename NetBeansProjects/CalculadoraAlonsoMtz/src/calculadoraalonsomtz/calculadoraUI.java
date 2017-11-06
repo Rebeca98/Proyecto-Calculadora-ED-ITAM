@@ -5,9 +5,6 @@
  */
 package calculadoraalonsomtz;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Stack;
 
 /**
  *
@@ -283,6 +280,11 @@ public class calculadoraUI extends javax.swing.JFrame {
         });
 
         calcDisplay.setFont(new java.awt.Font("Lucida Grande", 0, 22)); // NOI18N
+        calcDisplay.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                calcDisplayActionPerformed(evt);
+            }
+        });
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
@@ -388,18 +390,16 @@ public class calculadoraUI extends javax.swing.JFrame {
 
     
     //Atributos de clase
-    String[] coleccionOperadores = new String[]{"+","-","*","/"};
-    String[] coleccionNumeros = new String[]{"1","2","3","4","5","6","7","8","9","0"};
-    String[] coleccionParentesis = new String[]{"(",")"};
-    String displayText = " "; 
+
+    static String displayText = " "; 
     String lastAddedChar = " "; 
     
     
     public void onNumberClicked(String numero){
-        if (isOperador(numero) || isParentesis(numero)){
+        if (MyUtils.isOperador(numero) || MyUtils.isParentesis(numero)){
             displayText = displayText + " " + numero + " "; 
             lastAddedChar = numero; 
-        }else if (isNumero(numero) || isPuntoDecimal(numero) || numero.equals("~")){
+        }else if (MyUtils.isNumero(numero) || MyUtils.isPuntoDecimal(numero) || numero.equals("~")){
             displayText = displayText + numero; 
             lastAddedChar = numero; 
         }
@@ -413,71 +413,19 @@ public class calculadoraUI extends javax.swing.JFrame {
         refreshDisplay(); 
     }
     
-    public void refreshDisplay(){
+    public static void refreshDisplay(String newDisplayTxt){
+        displayText = newDisplayTxt; 
         calcDisplay.setText(displayText); 
     }
     
-    public boolean isOperador(String in){
-        return (Arrays.asList(coleccionOperadores).contains(in)); 
+    private static void refreshDisplay(){
+        calcDisplay.setText(displayText); 
     }
-    
-    public boolean isParentesis(String in){
-        return (Arrays.asList(coleccionParentesis).contains(in)); 
-    }
-    
-    public boolean isPuntoDecimal(String in){
-        return (in.equals(".")); 
-    }
-    
-    public boolean isNumero(String in){
-        return (Arrays.asList(coleccionNumeros).contains(in)); 
-    }
-    
-    public int getPrioridad(String c){
-        int ans = 0; 
-        switch(c){
-            case ("+"): 
-                ans = 1; 
-                break; 
-            case("-"): 
-                ans = 1; 
-                break;
-            case("*"): 
-                ans = 2; 
-                break; 
-            case("/"): 
-                ans = 2; 
-                break;
-        }
-        return ans; 
-    }
-    
-    public double ejecutarOperacion(String operador, double operando1, double operando2){
-        double res = 0; 
-        switch(operador){
-            case ("+"): 
-                res = operando1 + operando2; 
-                break; 
-            case ("-"): 
-                res = operando1 - operando2; 
-                break; 
-            case ("*"): 
-                res = operando1 * operando2; 
-                break; 
-            case ("/"): 
-                if (operando2 != 0){
-                    res = operando1 / operando2; 
-                }else {
-                    displayText = "División entre 0 no definida"; 
-                    refreshDisplay();  
-                }
-        }
-        return res; 
-    }
-    
+   
+   
     public void onSolveClick(String rawInput){
         //Paso 1: Chequeo sintactico
-        Boolean esValido = checarSintaxis(rawInput); 
+        Boolean esValido = MySolver.checarSintaxis(rawInput); 
         ////System.out.println(esValido); 
         
         //Paso 2: Convertir a notacion postfija
@@ -485,192 +433,18 @@ public class calculadoraUI extends javax.swing.JFrame {
             return; 
         }
         
-        String resultadoPostfijo = convierteAPostfijo(rawInput); 
+        String resultadoPostfijo = MySolver.convierteAPostfijo(rawInput); 
         System.out.println(resultadoPostfijo); 
         refreshDisplay(); 
         
         //Paso 3: Evaluar expresion
-        double resultadoFin = evaluaPostfijo(resultadoPostfijo); 
+        double resultadoFin = MySolver.evaluaPostfijo(resultadoPostfijo); 
         displayText = String.valueOf(resultadoFin); 
         refreshDisplay(); 
         
         
     }
-    
-    public boolean checarSintaxis(String input){
-        String c, c1; 
-        int indexLastClose = 0; 
-        int indexLastOpen = 0; 
-        boolean esValido = true; 
-        boolean parentesisSimetrico = true; 
-        
-        String[] inputSplit = input.trim().split(" "); 
-        
-        //Si está vacio, no es expresion válida, 
-        if (inputSplit.length <=0) {
-            displayText = "Error. Operacion vacia"; 
-            refreshDisplay(); 
-            return false; 
-        }
-        
-        //Si el primer o ultimo caracter son operadores, no tiene operando: error
-        if (isOperador(inputSplit[0]) || isOperador(inputSplit[inputSplit.length -1]) ){
-            esValido = false; 
-            displayText = "Error. Operador sin operando inmediato"; 
-            refreshDisplay(); 
-        }
-        
-        //Checar caracter por caracter
-        for (int i=0; i < inputSplit.length; i++){
-            c = inputSplit[i]; 
-            
-            //Obtiene el caracter siguiente al detectar que es operador. Si tambien es operador: error
-            if (i < inputSplit.length-1 && isOperador(c) ){
-                c1 = inputSplit[i+1]; 
-                if(isOperador(c1)){
-                    esValido = false; 
-                    displayText = "Error. Dos operadores contiguos"; 
-                    refreshDisplay(); 
-                }
-            }
-
-            //Loop que inicia si se detecta (. Para hasta encontrar ). Si no se encuentra: error. 
-            if (c.equals("(") && parentesisSimetrico){
-                indexLastOpen = i;  
-                for (int j = i+1; j < inputSplit.length; j++){
-                    if (inputSplit[j].equals(")") && j > indexLastClose){
-                        indexLastClose = j; 
-                        parentesisSimetrico = true; 
-                        break; 
-                    }else{
-                        parentesisSimetrico = false;
-                    }
-                }
-            }
-            
-            //Loop que inicia si de detecta ). Para hasta encontrar (. Si no se encuentra: error. 
-            if (c.equals(")") && parentesisSimetrico){
-                for (int j = i; j >= 0; j--){
-                    if (inputSplit[j].equals("(") && j <= indexLastOpen){
-                        indexLastOpen = j; 
-                        parentesisSimetrico = true; 
-                        break;
-                    }else{
-                        parentesisSimetrico = false;
-                    }
-                }
-            }
-            
-            
-        }
-
-        if (!parentesisSimetrico){
-            displayText = "Error. Parentesis desbalanceado"; 
-            refreshDisplay(); 
-            esValido = false; 
-        }
-        
-        return esValido; 
-    }
-    
-    public String convierteAPostfijo(String inputInfix){
-        //TODO: Tomar lo que este entre espcacios como numeros individuales. 
-        String[] inputSplit = inputInfix.trim().split("");         
-        
-        Stack<String> pilaOperadores = new Stack<String>(); 
-        String resultadoPostfijo = ""; 
-        
-        for (int j = 0; j < inputSplit.length ; j++){
-            String ch = inputSplit[j]; 
-            
-            if(isNumero(ch) || isPuntoDecimal(ch) || ch.equals(" ") || ch.equals("~")){
-                resultadoPostfijo = resultadoPostfijo + ch; 
-            } else if (isOperador(ch)){
-                while (!pilaOperadores.isEmpty() && getPrioridad(ch) <= getPrioridad(pilaOperadores.peek())){
-                    resultadoPostfijo = resultadoPostfijo + " " + pilaOperadores.pop(); 
-                }
-                pilaOperadores.push(ch); 
-            } else if (ch.equals("(")){
-                pilaOperadores.push(ch); 
-            } else if (ch.equals(")")){
-                while (!pilaOperadores.isEmpty() && !pilaOperadores.peek().equals("(")){
-                    resultadoPostfijo = resultadoPostfijo + pilaOperadores.pop(); 
-                }
-                pilaOperadores.pop(); 
-                
-            }
-
-        }
-        
-        while(!pilaOperadores.isEmpty()){
-            resultadoPostfijo = resultadoPostfijo + " " + pilaOperadores.pop(); 
-        }
-
-        return resultadoPostfijo; 
-        
-    }
-    
-    public boolean checaDobleDecimal(String inputInfix){
-        boolean ans = true; 
-        String[] inputSplit = inputInfix.trim().split("");      
-        
-        for (int i =0; i < inputSplit.length; i++){
-            int contadorPunto = 0;
-            String charchar = inputSplit[i];
-            
-            for (int j=0; j<charchar.length(); j++){
-                 
-                String curChar = String.valueOf(charchar.charAt(j)); 
-                if (curChar.equals(".")); 
-                contadorPunto++; 
-            }
-            if (contadorPunto > 1){
-                ans = false; 
-            }
-        }
-        return ans; 
-    }
-    
-    public double evaluaPostfijo(String inputPostfijo){
-        String[] inputProcesado = inputPostfijo.split(" "); 
-        
-        Stack<Double> pilaOperandos = new Stack<Double>(); 
-        double operando1 = 0; 
-        double operando2 = 0; 
-        double resultado = 0; 
-        
-
-        for (int i=0; i < inputProcesado.length ; i++){
-            String c = inputProcesado[i];
-
-            if (!c.equals("")){
-                System.out.println(c); 
-                System.out.println(String.valueOf(c.charAt(0))); 
-                if(!isOperador(c)){
-                    if (String.valueOf(c.charAt(0)).equals("~")){
-                        
-                        char[] newCharList = c.toCharArray(); 
-                        newCharList[0] = '-';
-                      
-                        pilaOperandos.push(Double.parseDouble(String.valueOf(newCharList))); 
-                    }else{
-                        pilaOperandos.push(Double.parseDouble(c)); 
-                    }
-                    
-                }else {
-                    operando1 = (double) pilaOperandos.pop(); 
-                    operando2 = (double) pilaOperandos.pop();
-                    resultado = ejecutarOperacion(c, operando1, operando2); 
-                    pilaOperandos.push(resultado); 
-                }
-            }
-        }
-        
-        double resultadoFin = (double) pilaOperandos.pop(); 
-       
-        return resultadoFin; 
-    }
-    
+  
     
     private void btnOpenParActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnOpenParActionPerformed
         onNumberClicked("("); 
@@ -752,6 +526,10 @@ public class calculadoraUI extends javax.swing.JFrame {
         clearAll(); 
     }//GEN-LAST:event_btnClearActionPerformed
 
+    private void calcDisplayActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_calcDisplayActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_calcDisplayActionPerformed
+
     /**
      * @param args the command line arguments
      */
@@ -808,6 +586,6 @@ public class calculadoraUI extends javax.swing.JFrame {
     private javax.swing.JButton btnPlus;
     private javax.swing.JButton btnSolve;
     private javax.swing.JButton btnTimes;
-    private javax.swing.JTextField calcDisplay;
+    private static javax.swing.JTextField calcDisplay;
     // End of variables declaration//GEN-END:variables
 }
